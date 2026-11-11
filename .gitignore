@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+output/
+*.log
+.app_prefs
+.app.lock
+.menubar_prefs
+.DS_Store
+

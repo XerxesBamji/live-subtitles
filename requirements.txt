@@ -1,0 +1,17 @@
+mlx==0.29.3
+mlx-whisper==0.4.3
+numpy==2.0.2
+websockets==15.0.1
+webrtcvad-wheels==2.0.14
+torch==2.8.0
+librosa==0.11.0
+huggingface_hub==1.8.0
+pyobjc-core==11.1
+pyobjc-framework-Cocoa==11.1
+pyobjc-framework-Quartz==11.1
+pyobjc-framework-CoreMedia==11.1
+pyobjc-framework-ScreenCaptureKit==11.1
+yt-dlp==2025.10.14
+# resemblyzer is installed separately with --no-deps (see setup.sh): it asks for
+# the original webrtcvad, which needs a compiler; webrtcvad-wheels replaces it.
+

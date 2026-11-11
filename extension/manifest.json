@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Live English Subtitles (local Whisper)",
+  "version": "1.0",
+  "description": "Captures this tab's audio, translates speech to English with a local Whisper server, and overlays subtitles.",
+  "permissions": ["tabCapture", "offscreen", "scripting", "activeTab", "storage"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Start / stop live English subtitles" }
+}
+
