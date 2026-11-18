@@ -30,6 +30,8 @@ chrome.action.onClicked.addListener(async (tab) => {
       justification: "Capture tab audio for live translation",
     });
     await chrome.storage.session.set({ tabId: tab.id });
+    // If the overlay was already loaded earlier in this tab, wake it up.
+    chrome.tabs.sendMessage(tab.id, { type: "caption", kind: "started" }).catch(() => {});
     await chrome.action.setBadgeBackgroundColor({ color: "#d93025" });
     await chrome.action.setBadgeText({ text: "ON" });
   } catch (e) {

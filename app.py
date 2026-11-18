@@ -317,7 +317,7 @@ class Controller(NSObject):
                 log.flush()
                 if proc is not self.proc:
                     continue
-                m = re.match(r"\[\s*[\d.]+s\] (.*)", line)
+                m = re.match(r"\[(?:\s*[\d.]+s|sub \d+ms)\] (.*)", line)
                 if m:
                     self.set_last_line(m.group(1).strip())
                 elif "Ready on" in line:

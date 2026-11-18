@@ -1,12 +1,12 @@
 # Live Subtitles (Spanish → English, runs on your Mac)
 
-Translates what people *say* in a video into English subtitles live, using
-Whisper running locally on your Mac's Apple Silicon chip. It doesn't need any
-existing subtitles, and nothing is uploaded anywhere.
+Translates Spanish videos into English subtitles live on your Mac's Apple
+Silicon chip, with nothing uploaded anywhere.
 
-- **Chrome:** subtitles appear on the YouTube video itself (fullscreen too).
-- **Safari or any other app:** subtitles appear in a floating bar above everything.
-- **Speakers:** each person gets their own colour, and a leading "–" marks a change of speaker.
+- **Automatic mode switching (Chrome):**
+  1. **Instant subtitle translation (~0.1s):** if the video has Spanish subtitles turned on (Disney+, Netflix, Prime Video, Max, YouTube CC, or standard HTML5 `<track>`s), the extension reads them—including inside Disney+'s closed Shadow DOM—hides the Spanish text, translates it locally with MarianMT (`Helsinki-NLP/opus-mt-es-en`), and shows the English subtitle in exact sync. Audio listening pauses automatically while subtitles are active.
+  2. **Voice listening fallback (Whisper):** when there are no subtitles on screen (like live YouTube streams), it automatically listens to the Spanish audio and translates what people say, colouring each speaker's lines.
+- **Safari or any other app:** captures the app's audio and shows subtitles in a floating bar above everything.
 
 > Requires an **Apple Silicon Mac** (M1/M2/M3/M4).
 

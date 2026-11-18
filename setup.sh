@@ -24,8 +24,8 @@ echo "📦 Installing packages (about 1 GB, a few minutes)…"
 .venv/bin/pip install -q -r requirements.txt
 .venv/bin/pip install -q --no-deps resemblyzer==0.1.4
 
-echo "🧠 Downloading the speech model (Medium, ~1.4 GB)…"
-PYTHONWARNINGS=ignore .venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('mlx-community/whisper-medium-mlx')" >/dev/null
+echo "🧠 Downloading the speech model (Medium, ~1.4 GB) and subtitle translator (~300 MB)…"
+PYTHONWARNINGS=ignore .venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('mlx-community/whisper-medium-mlx'); snapshot_download('Helsinki-NLP/opus-mt-es-en')" >/dev/null
 
 echo "🔨 Building the app…"
 ./build_app.sh

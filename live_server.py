@@ -113,6 +113,60 @@ def is_repeat(text: str, history) -> bool:
     return False
 
 
+class TextTranslator:
+    """Fast Spanish -> English *text* translation (for on-screen subtitles).
+    Runs on the CPU (~150 ms per line on an M4) so it never competes with Whisper."""
+
+    MODEL = "Helsinki-NLP/opus-mt-es-en"
+
+    def __init__(self):
+        import torch
+        from transformers import MarianMTModel, MarianTokenizer
+        torch.set_num_threads(4)
+        self.torch = torch
+        self.tok = MarianTokenizer.from_pretrained(self.MODEL)
+        self.model = MarianMTModel.from_pretrained(self.MODEL).eval()
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.cache = {}
+        self._run(["Hola, ¿qué tal?"])  # warm-up
+
+    def _run(self, lines):
+        todo = [l for l in lines if l not in self.cache]
+        if todo:
+            with self.torch.no_grad():
+                batch = self.tok(todo, return_tensors="pt", padding=True, truncation=True, max_length=200)
+                out = self.model.generate(**batch, num_beams=2, max_new_tokens=120)
+            for src, ids in zip(todo, out):
+                self.cache[src] = self.tok.decode(ids, skip_special_tokens=True)
+            if len(self.cache) > 5000:
+                self.cache.clear()
+        return [self.cache[l] for l in lines]
+
+    async def __call__(self, lines):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self.executor, self._run, lines)
+
+
+def split_subtitle(text: str):
+    """Split a subtitle into translatable pieces, keeping dialogue dashes
+    ("- ¿Vienes? - No.") so each speaker's line is translated on its own."""
+    pieces = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        is_dialogue = re.match(r"[-–—]", line) is not None
+        parts = re.split(r"\s(?=[-–—]\s?\S)", line) if is_dialogue else [line]
+        pieces.extend(p.strip() for p in parts if p.strip())
+    return pieces
+
+
+def split_sentences(line: str):
+    """'¿Qué haces aquí? Te dije que no.' -> ['¿Qué haces aquí?', 'Te dije que no.']"""
+    parts = re.split(r"(?<=[.!?…])\s+(?=[¿¡\"«A-ZÁÉÍÓÚÑ])", line)
+    return [p for p in parts if p.strip()]
+
+
 class SpeakerTracker:
     """Online speaker clustering: each line's voiceprint is matched to the
     closest known voice, or starts a new speaker if nothing is similar enough."""
@@ -183,6 +237,7 @@ class Session:
         self.vad = webrtcvad.Vad(args.vad) if webrtcvad else None
         self.vad_rem = np.zeros(0, np.float32)
         self.closed = False
+        self.paused = False         # True while the page shows its own subtitles
 
     def _is_speech(self, frame: np.ndarray) -> bool:
         rms = float(np.sqrt(np.mean(frame ** 2)))
@@ -194,7 +249,7 @@ class Session:
         return self.vad.is_speech(pcm, SR)
 
     def feed(self, chunk: np.ndarray):
-        if not len(chunk):
+        if not len(chunk) or self.paused:
             return
         self.received += len(chunk) / SR
         self.buf = np.concatenate([self.buf, chunk])
@@ -325,6 +380,8 @@ async def main():
     p.add_argument("--speaker-threshold", type=float, default=0.72,
                    help="voice similarity needed to count as the same person (0-1)")
     p.add_argument("--max-speakers", type=int, default=6)
+    p.add_argument("--no-text-translation", dest="text_translation", action="store_false",
+                   help="don't load the subtitle (text) translator")
     p.add_argument("--exit-with-parent", action="store_true", help=argparse.SUPPRESS)
     args = p.parse_args()
 
@@ -346,6 +403,39 @@ async def main():
     if args.speakers and VoiceEncoder is not None:
         print("Loading speaker detection...", flush=True)
         speakers = SpeakerTracker(args.speaker_threshold, args.max_speakers)
+    text_tr = None
+    if args.text_translation:
+        try:
+            print("Loading subtitle translator...", flush=True)
+            text_tr = TextTranslator()
+        except Exception as e:
+            print(f"Subtitle translator unavailable: {e!r}", flush=True)
+
+    async def translate_subtitle(s, msg_id, text):
+        t0 = time.monotonic()
+        # The model sometimes drops a second sentence, so translate sentence by
+        # sentence and stitch each subtitle line back together.
+        lines = [split_sentences(p) for p in split_subtitle(text)]
+        flat = [sent for line in lines for sent in line]
+        out = iter(await text_tr(flat) if flat else [])
+        english = "\n".join(" ".join(next(out) for _ in line) for line in lines)
+        log(f"SUBTITLE {1000 * (time.monotonic() - t0):.0f}ms {text!r} -> {english!r}")
+        print(f"[sub {1000 * (time.monotonic() - t0):.0f}ms] {english}", flush=True)
+        try:
+            await s.ws.send(json.dumps({"type": "translation", "id": msg_id, "text": english}))
+        except websockets.ConnectionClosed:
+            pass
+
+    async def handle_control(s, msg):
+        kind = msg.get("type")
+        if kind == "translate" and text_tr is not None:
+            asyncio.create_task(translate_subtitle(s, msg.get("id"), msg.get("text", "")))
+        elif kind == "pause":
+            s.paused = bool(msg.get("paused"))
+            if s.paused:
+                s.buf = np.zeros(0, np.float32)
+                s.heard_speech = False
+            print(f"Audio listening {'paused – using on-screen subtitles' if s.paused else 'resumed'}.", flush=True)
 
     async def handler(ws):
         print("Browser connected.", flush=True)
@@ -357,6 +447,8 @@ async def main():
             async for msg in ws:
                 if isinstance(msg, bytes):
                     s.feed(np.frombuffer(msg, dtype=np.float32))
+                else:
+                    await handle_control(s, json.loads(msg))
         except websockets.ConnectionClosed:
             pass
         finally:

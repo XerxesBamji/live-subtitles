@@ -4,6 +4,9 @@ numpy==2.0.2
 websockets==15.0.1
 webrtcvad-wheels==2.0.14
 torch==2.8.0
+transformers==4.46.3
+sentencepiece==0.2.0
+sacremoses==0.1.1
 librosa==0.11.0
 huggingface_hub==1.8.0
 pyobjc-core==11.1
