@@ -91,7 +91,7 @@ On any Mac, run this in the project folder:
 
 ```bash
 cd ~/Documents/translatoryoutube
-git pull && ./build_app.sh
+git pull && ./setup.sh
 ```
 
 Then reopen the app. If the Chrome extension changed:
